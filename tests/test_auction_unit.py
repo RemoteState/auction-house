@@ -35,7 +35,12 @@ def test_cannot_bid_unless_added():
     tx = auction.StartAuction(TEST_URI, {"from": account})
     tx.wait(1)
     with pytest.raises(exceptions.VirtualMachineError):
-        auction.NewBid(auction.GAS_FEE() + Web3.toWei(1, "ether"), {"from": account})
+        # auction.NewBid(auction.GAS_FEE() + Web3.toWei(1, "ether"), {"from": account})
+        rsCoin.transferAndCall(
+            auction.address,
+            auction.GAS_FEE() + Web3.toWei(1, "ether"),
+            {"from": account},
+        )
 
 
 def test_cannot_bid_without_rscoin():
@@ -47,7 +52,11 @@ def test_cannot_bid_without_rscoin():
     tx.wait(1)
     assert rsCoin.balanceOf(account) == 0
     with pytest.raises(exceptions.VirtualMachineError):
-        auction.NewBid(auction.GAS_FEE() + Web3.toWei(1, "ether"), {"from": account})
+        rsCoin.transferAndCall(
+            auction.address,
+            auction.GAS_FEE() + Web3.toWei(1, "ether"),
+            {"from": account},
+        )
 
 
 def test_cannot_bid_unless_open():
@@ -62,7 +71,11 @@ def test_cannot_bid_unless_open():
     tx = auction.AddPlayer(account, {"from": account})
     tx.wait(1)
     with pytest.raises(exceptions.VirtualMachineError):
-        auction.NewBid(Web3.toWei(1, "ether"), {"from": account})
+        rsCoin.transferAndCall(
+            auction.address,
+            auction.GAS_FEE() + Web3.toWei(1, "ether"),
+            {"from": account},
+        )
 
 
 def test_can_bid():
@@ -77,7 +90,11 @@ def test_can_bid():
     )
     tx = auction.AddPlayer(account, {"from": account})
     tx.wait(1)
-    tx2 = auction.NewBid(Web3.toWei(1, "ether"), {"from": account})
+    tx2 = rsCoin.transferAndCall(
+        auction.address,
+        auction.GAS_FEE() + Web3.toWei(1, "ether"),
+        {"from": account},
+    )
     tx2.wait(1)
     assert auction.winningBid() == Web3.toWei(1, "ether")
     assert auction.winningBidder() == account.address
@@ -94,25 +111,21 @@ def test_new_bid_works_properly():
     tx.wait(1)
     tx = auction.AddPlayer(get_account(index=1), {"from": account})
     tx.wait(1)
-    tx = rsCoin.approve(
-        auction.address, Web3.toWei(1, "ether") + auction.GAS_FEE(), {"from": account}
+    tx2 = rsCoin.transferAndCall(
+        auction.address,
+        auction.GAS_FEE() + Web3.toWei(1, "ether"),
+        {"from": account},
     )
-    tx.wait(1)
-    tx2 = auction.NewBid(Web3.toWei(1, "ether"), {"from": account})
     tx2.wait(1)
     account = get_account(index=1)
     tx = rsCoin.transfer(
         account, Web3.toWei(50, "ether"), {"from": get_account(index=0)}
     )
     tx.wait(1)
-    tx = rsCoin.approve(
+    tx3 = rsCoin.transferAndCall(
         auction.address,
-        Web3.toWei(1, "ether") + auction.winningBid() + auction.GAS_FEE(),
+        (auction.GAS_FEE() + Web3.toWei(2, "ether")),
         {"from": account},
-    )
-    tx.wait(1)
-    tx3 = auction.NewBid(
-        Web3.toWei(1, "ether") + auction.winningBid(), {"from": account}
     )
     tx3.wait(1)
     assert auction.winningBid() == Web3.toWei(2, "ether")
@@ -139,15 +152,15 @@ def test_mining_works_properly():
     tx.wait(1)
     tx = auction.AddPlayer(get_account(index=1), {"from": account})
     tx.wait(1)
-    tx = rsCoin.approve(auction.address, Web3.toWei(500, "ether"), {"from": account})
     tx.wait(1)
     for i in range(0, 10):
-        tx = auction.NewBid(
-            auction.winningBid() + Web3.toWei(1, "ether"), {"from": account}
+        tx = rsCoin.transferAndCall(
+            auction.address,
+            (auction.GAS_FEE() + Web3.toWei(2, "ether") + auction.winningBid()),
+            {"from": account},
         )
-        tx.wait(1)
     print(rsCoin.balanceOf(get_account(index=1)))
-    assert auction.winningBid() == Web3.toWei(10, "ether")
+    assert auction.winningBid() == Web3.toWei(20, "ether")
     assert rsCoin.balanceOf(get_account(index=1)) != 0
 
 
@@ -162,25 +175,21 @@ def test_can_pick_winner_correctly():
     tx.wait(1)
     tx = auction.AddPlayer(get_account(index=1), {"from": account})
     tx.wait(1)
-    tx = rsCoin.approve(
-        auction.address, Web3.toWei(1, "ether") + auction.GAS_FEE(), {"from": account}
+    tx2 = rsCoin.transferAndCall(
+        auction.address,
+        (auction.GAS_FEE() + Web3.toWei(1, "ether")),
+        {"from": account},
     )
-    tx.wait(1)
-    tx2 = auction.NewBid(Web3.toWei(1, "ether"), {"from": account})
     tx2.wait(1)
     account = get_account(index=1)
     tx = rsCoin.transfer(
         account, Web3.toWei(50, "ether"), {"from": get_account(index=0)}
     )
     tx.wait(1)
-    tx = rsCoin.approve(
+    tx3 = rsCoin.transferAndCall(
         auction.address,
-        Web3.toWei(1, "ether") + auction.winningBid() + auction.GAS_FEE(),
+        (auction.GAS_FEE() + Web3.toWei(1, "ether") + auction.winningBid()),
         {"from": account},
-    )
-    tx.wait(1)
-    tx3 = auction.NewBid(
-        Web3.toWei(1, "ether") + auction.winningBid(), {"from": account}
     )
     tx3.wait(1)
     amount = rsCoin.balanceOf(get_account(index=0)) + rsCoin.balanceOf(auction.address)

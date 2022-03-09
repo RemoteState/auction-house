@@ -4,11 +4,10 @@ pragma solidity 0.6.6;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@chainlink/contracts/src/v0.6/VRFConsumerBase.sol";
 import "./RSCoin.sol";
 import "./SimpleCollectible.sol";
 
-contract AuctionHouse is Ownable, IERC721Receiver, VRFConsumerBase {
+contract AuctionHouse is Ownable, IERC721Receiver {
     enum AUCTION_STATE {
         OPEN,
         CLOSED,
@@ -27,25 +26,17 @@ contract AuctionHouse is Ownable, IERC721Receiver, VRFConsumerBase {
     SimpleCollectible public nft;
     uint256 public currentTokenId;
     RSCoin public currency;
-    uint256 public GAS_FEE = 500000000000000000;
+    uint256 public constant GAS_FEE = 500000000000000000;
     address internal currentBidder;
-    uint256 internal fee;
-    bytes32 internal keyHash;
 
     constructor(
         string memory _name,
         string memory _symbol,
-        address _currency,
-        address _vrfCoordinator,
-        address _link,
-        uint256 _fee,
-        bytes32 _keyHash
-    ) public VRFConsumerBase(_vrfCoordinator, _link) {
+        address _currency
+    ) public {
         auction_state = AUCTION_STATE.CLOSED;
         nft = new SimpleCollectible(_name, _symbol);
         currency = RSCoin(_currency);
-        fee = _fee;
-        keyHash = _keyHash;
     }
 
     function onERC721Received(
@@ -99,48 +90,29 @@ contract AuctionHouse is Ownable, IERC721Receiver, VRFConsumerBase {
         currency.transfer(owner(), winningBid);
     }
 
-    function NewBid(uint256 amount) public CheckPlayer(msg.sender) {
+    function onTokenTransfer(address payable sender, uint256 amount)
+        external
+        CheckPlayer(sender)
+        returns (bool success)
+    {
         require(auction_state == AUCTION_STATE.OPEN, "Auction not open yet!");
         require(
-            amount > winningBid,
+            (amount - GAS_FEE) > winningBid,
             "Amount needs to be greater than current bid!"
         );
-        require(
-            currency.balanceOf(msg.sender) >= GAS_FEE + amount,
-            "Not enough balance!"
-        );
-        require(
-            currency.allowance(msg.sender, address(this)) >= GAS_FEE + amount,
-            "Not approved!"
-        );
-        currentBidder = msg.sender;
+        require(msg.sender == address(currency));
+        currentBidder = sender;
         uint256 random = random();
         address randomMiner = players[random % players.length];
-        require(currency.transferFrom(msg.sender, randomMiner, GAS_FEE));
-        require(currency.transferFrom(msg.sender, address(this), amount));
-
-        // bytes32 requestId = requestRandomness(keyHash, fee);
-        // emit RequestedRandomness(requestId);
+        require(currency.transfer(randomMiner, GAS_FEE));
 
         if (winningBid != 0 && winningBidder != address(0)) {
-            currency.transfer(winningBidder, winningBid);
+            require(currency.transfer(winningBidder, winningBid));
         }
         emit HighestBidIncreased(msg.sender, amount);
-        winningBidder = msg.sender;
-        winningBid = amount;
-    }
-
-    // Deprecating usage because time taken for VRFCoordinator to callback is too long
-
-    function fulfillRandomness(bytes32 requestId, uint256 randomness)
-        internal
-        override
-    {
-        require(randomness > 0, "Randomness not generated");
-        uint256 randomMiner = randomness % players.length;
-        require(
-            currency.transferFrom(currentBidder, players[randomMiner], GAS_FEE)
-        );
+        winningBidder = sender;
+        winningBid = amount - GAS_FEE;
+        return true;
     }
 
     function random() private view returns (uint256) {
