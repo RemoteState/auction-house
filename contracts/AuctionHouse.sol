@@ -18,7 +18,11 @@ contract AuctionHouse is Ownable, IERC721Receiver {
     mapping(address => uint256) internal playersIndex;
     uint256 public winningBid;
     address payable public winningBidder;
-    event HighestBidIncreased(address bidder, uint256 amount);
+    event HighestBidIncreased(
+        uint256 indexed tokenId,
+        address bidder,
+        uint256 amount
+    );
     event AuctionEnded(address winner, uint256 amount, uint256 tokenId);
     // event RequestedRandomness(bytes32 requestId);
     mapping(address => uint256) public winnerToObjectMap;
@@ -109,9 +113,9 @@ contract AuctionHouse is Ownable, IERC721Receiver {
         if (winningBid != 0 && winningBidder != address(0)) {
             require(currency.transfer(winningBidder, winningBid));
         }
-        emit HighestBidIncreased(msg.sender, amount);
         winningBidder = sender;
         winningBid = amount - GAS_FEE;
+        emit HighestBidIncreased(currentTokenId, sender, winningBid);
         return true;
     }
 
@@ -134,5 +138,22 @@ contract AuctionHouse is Ownable, IERC721Receiver {
 
     function ReturnWinner(uint256 index) external view returns (address) {
         return winners[index];
+    }
+
+    function IsPlayerAdded() external view returns (bool) {
+        if (playersIndex[msg.sender] == 0) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    function GetMetaDataByTokenID(uint256 _token_id)
+        external
+        view
+        returns (string memory)
+    {
+        require(_token_id <= currentTokenId);
+        return nft.tokenURI(_token_id);
     }
 }

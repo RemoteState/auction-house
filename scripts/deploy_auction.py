@@ -23,7 +23,9 @@ def deploy_auction():
 
 
 def start_auction():
-    sample_token_uri = "https://ipfs.io/ipfs/Qmd9MCGtdVz2miNumBHDbvj8bigSgTwnr4SbyH6DNnpWdt?filename=0-PUG.json"
+    sample_token_uri = (
+        "https://ipfs.infura.io/ipfs/QmfZMEpdKQXBYPyeRVoPbJ1a9uM6z5w2CQSzcvAc5sWYZV"
+    )
     account = get_account()
     auction = AuctionHouse[-1]
     fund_with_link(auction.address)
